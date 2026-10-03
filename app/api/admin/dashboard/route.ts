@@ -16,7 +16,7 @@ export async function GET(req:Request){
     const today=lagosDate();
     const month=url.searchParams.get("month")||today.slice(0,7);
     const selectedDate=url.searchParams.get("date")||today;
-    const {start,end,days}=monthBounds(month);
+    const {start,end}=monthBounds(month);
     const sql=await db();
 
     const settings=(await sql`
@@ -37,47 +37,67 @@ export async function GET(req:Request){
     settings.reopened=reopened;
     settings.auto_close_time=String(settings?.auto_close_time||"10:00:00").slice(0,5);
 
+    const activeCountRows=await sql`SELECT COUNT(*)::int AS count FROM attendance_members WHERE active=true`;
+    const activeMemberCount=Number(activeCountRows[0]?.count||0);
+
     const todayRows=await sql`
       SELECT m.id,m.full_name,a.marked_at,a.status,a.cutoff_used::text,a.minutes_late
-      FROM attendance_members m
-      LEFT JOIN attendance_marks a ON a.member_id=m.id AND a.attendance_date=${today}::date
-      WHERE m.active=true ORDER BY m.full_name
+      FROM attendance_sessions s
+      JOIN attendance_member_periods p
+        ON s.attendance_date >= p.active_from
+       AND (p.inactive_from IS NULL OR s.attendance_date < p.inactive_from)
+      JOIN attendance_members m ON m.id=p.member_id
+      LEFT JOIN attendance_marks a ON a.member_id=m.id AND a.attendance_date=s.attendance_date
+      WHERE s.attendance_date=${today}::date
+      ORDER BY m.full_name
     `;
 
     const selectedRows=await sql`
       SELECT m.id,m.full_name,a.marked_at,a.status,a.cutoff_used::text,a.minutes_late
-      FROM attendance_members m
-      LEFT JOIN attendance_marks a ON a.member_id=m.id AND a.attendance_date=${selectedDate}::date
-      WHERE m.joined_at::date <= ${selectedDate}::date
+      FROM attendance_sessions s
+      JOIN attendance_member_periods p
+        ON s.attendance_date >= p.active_from
+       AND (p.inactive_from IS NULL OR s.attendance_date < p.inactive_from)
+      JOIN attendance_members m ON m.id=p.member_id
+      LEFT JOIN attendance_marks a ON a.member_id=m.id AND a.attendance_date=s.attendance_date
+      WHERE s.attendance_date=${selectedDate}::date
       ORDER BY m.full_name
     `;
 
-    const currentDay=Number(today.slice(-2));
-    const elapsed = month===today.slice(0,7) ? Math.min(currentDay,days) : (month<today.slice(0,7)?days:0);
-
     const memberRows=await sql`
-      SELECT m.id,m.full_name,m.active,
-        COUNT(a.id)::int AS days_present,
+      SELECT
+        m.id,m.full_name,m.active,
+        COUNT(DISTINCT s.attendance_date)::int AS expected_sessions,
+        COUNT(DISTINCT a.attendance_date)::int AS days_present,
         COUNT(a.id) FILTER (WHERE a.status='late')::int AS late_count,
         COALESCE(SUM(a.minutes_late) FILTER (WHERE a.status='late'),0)::int AS total_minutes_late,
         COALESCE(ROUND(AVG(a.minutes_late) FILTER (WHERE a.status='late')),0)::int AS avg_minutes_late
       FROM attendance_members m
-      LEFT JOIN attendance_marks a ON a.member_id=m.id AND a.attendance_date BETWEEN ${start}::date AND ${end}::date
+      LEFT JOIN attendance_member_periods p ON p.member_id=m.id
+      LEFT JOIN attendance_sessions s
+        ON s.attendance_date BETWEEN ${start}::date AND ${end}::date
+       AND s.attendance_date >= p.active_from
+       AND (p.inactive_from IS NULL OR s.attendance_date < p.inactive_from)
+      LEFT JOIN attendance_marks a
+        ON a.member_id=m.id
+       AND a.attendance_date=s.attendance_date
       GROUP BY m.id,m.full_name,m.active
       ORDER BY m.active DESC,m.full_name
     `;
 
     const members=memberRows.map((m:any)=>{
+      const expected=Number(m.expected_sessions||0);
       const p=Number(m.days_present||0);
-      const a=Math.max(0,elapsed-p);
+      const a=Math.max(0,expected-p);
       return {
         ...m,
+        expected_sessions:expected,
         days_present:p,
         days_absent:a,
         late_count:Number(m.late_count||0),
         total_minutes_late:Number(m.total_minutes_late||0),
         avg_minutes_late:Number(m.avg_minutes_late||0),
-        attendance_pct:elapsed?Math.round((p/elapsed)*100):0
+        attendance_pct:expected?Math.round((p/expected)*100):0
       };
     });
 
@@ -95,7 +115,9 @@ export async function GET(req:Request){
       selectedDate,
       members,
       month,
-      date:today
+      date:today,
+      active_member_count:activeMemberCount,
+      selected_session_exists:selectedRows.length>0
     });
   }catch(e){
     console.error(e);
