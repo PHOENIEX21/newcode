@@ -10,7 +10,7 @@ type DayRow={
   cutoff_used:string|null;minutes_late:number|null
 };
 type Dashboard={
-  settings:{current_code:string;is_open:boolean;effective_open:boolean;cutoff_time:string;auto_close_time:string;expired:boolean;reopened:boolean};
+  settings:{current_code:string;is_open:boolean;effective_open:boolean;cutoff_time:string;auto_close_time:string;expired:boolean;reopened:boolean;code_ready:boolean;session_today:boolean};
   members:Member[];today:DayRow[];selectedDay:DayRow[];selectedDate:string;month:string;date:string
 };
 
@@ -25,6 +25,8 @@ export default function AdminClient(){
   const [code,setCode]=useState("");
   const [cutoff,setCutoff]=useState("07:15");
   const [msg,setMsg]=useState("");
+  const [sessionMsg,setSessionMsg]=useState("");
+  const [savingSession,setSavingSession]=useState(false);
   const [loading,setLoading]=useState(true);
   const [showTodayAbsent,setShowTodayAbsent]=useState(false);
   const [showTodayPresent,setShowTodayPresent]=useState(false);
@@ -45,12 +47,15 @@ export default function AdminClient(){
 
   useEffect(()=>{load(month,selectedDate)},[month,selectedDate]);
 
-  async function settings(patch:Record<string,unknown>){
+  async function settings(patch:Record<string,unknown>,local=true){
     setMsg("");
+    if(local){setSessionMsg("");setSavingSession(true);}
     const r=await fetch("/api/admin/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(patch)});
     const j=await r.json();
-    setMsg(j.message||"Updated.");
+    if(local) setSessionMsg(j.message||"Updated."); else setMsg(j.message||"Updated.");
     if(r.ok) await load();
+    if(local) setSavingSession(false);
+    return {ok:r.ok,message:j.message};
   }
 
   async function addMember(e:React.FormEvent){
@@ -121,11 +126,11 @@ export default function AdminClient(){
 
     <section className={"grid2 admin-section "+(mobileSection==="session"||mobileSection==="members"?"mobile-show":"mobile-hide")} style={{marginTop:16}}>
       <div id="section-session" className={"card section-anchor "+(mobileSection==="members"?"mobile-inner-hide":"")}>
-        <div className="split"><div><p className="muted small">TODAY&apos;S SESSION</p><h2>{data?.settings.effective_open?"Attendance is open":data?.settings.expired?"Attendance expired at 10:00 AM":"Attendance is closed"}</h2></div><span className="pill"><span className={"dot "+(data?.settings.is_open?"open":"")}/>{data?.date||"Today"}</span></div>
+        <div className="split"><div><p className="muted small">TODAY&apos;S SESSION</p><h2>{data?.settings.effective_open?"Attendance is open":data?.settings.expired?"Attendance expired at 10:00 AM":"Attendance is closed"}</h2><div className="muted small">{data?.settings.code_ready?"Today’s code is ready.":"Prepare a fresh 4-digit code for today before opening attendance."}</div></div><span className="pill"><span className={"dot "+(data?.settings.is_open?"open":"")}/>{data?.date||"Today"}</span></div>
         <div className="form">
-          <div className="field"><label>4-digit code</label><div className="actions"><input className="input" style={{maxWidth:180}} value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,"").slice(0,4))} inputMode="numeric"/><button className="button" onClick={()=>settings({code})}>Save code</button><button className="button secondary" onClick={()=>{const c=String(Math.floor(1000+Math.random()*9000));setCode(c);settings({code:c})}}>Generate</button></div></div>
+          <div className="field"><label>Today&apos;s 4-digit code</label><div className="actions"><input className="input" style={{maxWidth:180}} value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,"").slice(0,4))} inputMode="numeric"/><button className="button" disabled={savingSession||code.length!==4} onClick={()=>settings({code})}>{savingSession?"Saving…":"Save code"}</button><button className="button secondary" disabled={savingSession} onClick={()=>{const c=String(Math.floor(1000+Math.random()*9000));setCode(c);settings({code:c})}}>Generate new code</button></div><div className="muted small">Generate saves the new code immediately. Saving a typed code also makes it today&apos;s code.</div></div>
           <div className="field"><label>Approved marking time</label><div className="actions"><input type="time" className="input" style={{maxWidth:180}} value={cutoff} onChange={e=>setCutoff(e.target.value)}/><button className="button secondary" onClick={()=>settings({cutoff})}>Update cut-off</button></div></div>
-          <div className="muted small">Automatically locks at {data?.settings.auto_close_time||"10:00"} Lagos time. Admin can reopen it after expiry.</div><div className="actions"><button className="button" onClick={()=>settings({is_open:!data?.settings.effective_open})}>{data?.settings.effective_open?"Close attendance":data?.settings.expired?"Reopen attendance":"Open attendance"}</button></div>
+          <div className="muted small">Daily flow: prepare today&apos;s code → open attendance → members mark → automatic lock at {data?.settings.auto_close_time||"10:00"} Lagos time. Tomorrow starts closed again.</div>{sessionMsg&&<div className="notice ok">{sessionMsg}</div>}<div className="actions"><button className="button" disabled={savingSession||(!data?.settings.effective_open&&!data?.settings.code_ready)} onClick={()=>settings({is_open:!data?.settings.effective_open})}>{savingSession?"Updating…":data?.settings.effective_open?"Close attendance":data?.settings.expired?"Reopen attendance":"Open attendance"}</button></div>
         </div>
       </div>
 
