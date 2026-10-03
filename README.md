@@ -32,3 +32,5 @@ Run npm install, add the environment variables in .env.local, then run npm run d
 <!-- deploy current monthly horizontal-scroll table -->
 
 <!-- final production deploy: session-based attendance accounting -->
+
+<!-- production release trigger after final green CI -->
