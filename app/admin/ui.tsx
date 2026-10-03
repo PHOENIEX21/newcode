@@ -30,6 +30,7 @@ export default function AdminClient(){
   const [showTodayPresent,setShowTodayPresent]=useState(false);
   const [showHistoryAbsent,setShowHistoryAbsent]=useState(false);
   const [showHistoryPresent,setShowHistoryPresent]=useState(false);
+  const [expandedMember,setExpandedMember]=useState<number|null>(null);
 
   async function load(m=month,d=selectedDate){
     setLoading(true);
@@ -150,7 +151,29 @@ export default function AdminClient(){
 
     <section className="card" style={{marginTop:16}}>
       <div className="split"><div><p className="muted small">MONTHLY REGISTER</p><h2>Attendance performance</h2></div><input type="month" className="input" style={{maxWidth:190}} value={month} onChange={e=>setMonth(e.target.value)}/></div>
-      {loading?<div className="empty">Loading register…</div>:<div className="tablewrap"><table className="monthly-table"><thead><tr><th>Name</th><th>Present</th><th>Absent</th><th>Late</th><th>Total late mins</th><th>Avg late mins</th><th>Attendance</th><th>Status</th><th></th></tr></thead><tbody>{data?.members.map(m=><tr key={m.id}><td>{m.full_name}</td><td>{m.days_present}</td><td>{m.days_absent}</td><td>{m.late_count}</td><td>{m.total_minutes_late}</td><td>{m.late_count?m.avg_minutes_late:0}</td><td>{m.attendance_pct}%</td><td>{m.active?<span className="tag present">Active</span>:<span className="tag absent">Inactive</span>}</td><td><button className="button secondary" onClick={()=>toggleMember(m.id,!m.active)}>{m.active?"Deactivate":"Reactivate"}</button></td></tr>)}</tbody></table></div>}
+      {loading?<div className="empty">Loading register…</div>:<>
+        <div className="tablewrap desktop-monthly"><table className="monthly-table"><thead><tr><th>Name</th><th>Present</th><th>Absent</th><th>Late</th><th>Total late mins</th><th>Avg late mins</th><th>Attendance</th><th>Status</th><th></th></tr></thead><tbody>{data?.members.map(m=><tr key={m.id}><td>{m.full_name}</td><td>{m.days_present}</td><td>{m.days_absent}</td><td>{m.late_count}</td><td>{m.total_minutes_late}</td><td>{m.late_count?m.avg_minutes_late:0}</td><td>{m.attendance_pct}%</td><td>{m.active?<span className="tag present">Active</span>:<span className="tag absent">Inactive</span>}</td><td><button className="button secondary" onClick={()=>toggleMember(m.id,!m.active)}>{m.active?"Deactivate":"Reactivate"}</button></td></tr>)}</tbody></table></div>
+        <div className="mobile-monthly">{data?.members.map(m=>{
+          const open=expandedMember===m.id;
+          return <div className="member-summary" key={m.id}>
+            <button className="member-summary-head" onClick={()=>setExpandedMember(open?null:m.id)}>
+              <span><b>{m.full_name}</b><small>{m.attendance_pct}% attendance</small></span>
+              <span className={"summary-chevron "+(open?"open":"")}>⌄</span>
+            </button>
+            <div className="member-summary-stats">
+              <span><b>{m.days_present}</b><small>Present</small></span>
+              <span><b>{m.days_absent}</b><small>Absent</small></span>
+              <span><b>{m.late_count}</b><small>Late</small></span>
+            </div>
+            {open&&<div className="member-summary-detail">
+              <div><span>Total late minutes</span><b>{m.total_minutes_late}</b></div>
+              <div><span>Average late minutes</span><b>{m.late_count?m.avg_minutes_late:0}</b></div>
+              <div><span>Status</span>{m.active?<span className="tag present">Active</span>:<span className="tag absent">Inactive</span>}</div>
+              <button className="button secondary" onClick={()=>toggleMember(m.id,!m.active)}>{m.active?"Deactivate member":"Reactivate member"}</button>
+            </div>}
+          </div>
+        })}</div>
+      </>}
     </section>
   </main>
 }
