@@ -11,7 +11,7 @@ type DayRow={
 };
 type Dashboard={
   settings:{current_code:string;is_open:boolean;effective_open:boolean;cutoff_time:string;auto_close_time:string;expired:boolean;reopened:boolean;code_ready:boolean;session_today:boolean};
-  members:Member[];today:DayRow[];selectedDay:DayRow[];selectedDate:string;month:string;date:string
+  members:Member[];today:DayRow[];selectedDay:DayRow[];selectedDate:string;month:string;date:string;active_member_count:number;selected_session_exists:boolean
 };
 
 export default function AdminClient(){
@@ -121,7 +121,7 @@ export default function AdminClient(){
       <div className="stat"><span className="muted small">Present today</span><b>{present.length}</b></div>
       <div className="stat"><span className="muted small">Absent today</span><b>{absent.length}</b></div>
       <div className="stat"><span className="muted small">Late today</span><b>{late.length}</b></div>
-      <div className="stat"><span className="muted small">Active members</span><b>{data?.today.length??0}</b></div>
+      <div className="stat"><span className="muted small">Active members</span><b>{data?.active_member_count??0}</b></div>
     </section>
 
     <section className={"grid2 admin-section "+(mobileSection==="session"||mobileSection==="members"?"mobile-show":"mobile-hide")} style={{marginTop:16}}>
@@ -162,6 +162,7 @@ export default function AdminClient(){
         <div className="stat"><span className="muted small">Date</span><b style={{fontSize:18}}>{data?.selectedDate||selectedDate}</b></div>
       </div>
 
+      {!data?.selected_session_exists&&<div className="notice" style={{marginTop:16}}>No attendance session was opened on this date, so nobody is counted absent.</div>}
       <div className="grid2" style={{marginTop:16}}>
         <div>
           <h3>Absent ({selectedAbsent.length})</h3>
