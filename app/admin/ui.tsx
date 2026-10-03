@@ -108,8 +108,8 @@ export default function AdminClient(){
     <section className="card" style={{marginTop:16}}>
       <div className="split"><div><p className="muted small">DAILY CHECK</p><h2>Today at a glance</h2></div><a className="button secondary" href={`/api/admin/export?month=${month}`}>Export month CSV</a></div>
       <div className="grid2">
-        <div><h3>Absent ({absent.length})</h3>{absent.length?<div className="tablewrap"><table><tbody>{absent.map(x=><tr key={x.id}><td>{x.full_name}</td><td><span className="tag absent">Absent</span></td></tr>)}</tbody></table></div>:<div className="empty">Nobody absent.</div>}</div>
-        <div><h3>Present ({present.length})</h3>{present.length?<div className="tablewrap"><table><thead><tr><th>Name</th><th>Marked</th><th>Cut-off</th><th>Status</th></tr></thead><tbody>{present.map(x=><tr key={x.id}><td>{x.full_name}</td><td>{x.marked_at}</td><td>{x.cutoff_used||String(data?.settings.cutoff_time||"").slice(0,5)}</td><td><span className={"tag "+(x.status==="late"?"late":"present")}>{x.status==="late"?lateDetail(x):"On time"}</span></td></tr>)}</tbody></table></div>:<div className="empty">No one has marked yet.</div>}</div>
+        <div><h3>Absent ({absent.length})</h3>{absent.length?<div className="tablewrap"><table className="absent-table"><tbody>{absent.map(x=><tr key={x.id}><td>{x.full_name}</td><td><span className="tag absent">Absent</span></td></tr>)}</tbody></table></div>:<div className="empty">Nobody absent.</div>}</div>
+        <div><h3>Present ({present.length})</h3>{present.length?<div className="tablewrap"><table className="present-table"><thead><tr><th>Name</th><th>Marked</th><th>Cut-off</th><th>Status</th></tr></thead><tbody>{present.map(x=><tr key={x.id}><td>{x.full_name}</td><td>{x.marked_at}</td><td>{x.cutoff_used||String(data?.settings.cutoff_time||"").slice(0,5)}</td><td><span className={"tag "+(x.status==="late"?"late":"present")}>{x.status==="late"?lateDetail(x):"On time"}</span></td></tr>)}</tbody></table></div>:<div className="empty">No one has marked yet.</div>}</div>
       </div>
     </section>
 
@@ -130,13 +130,13 @@ export default function AdminClient(){
         <div>
           <h3>Absent ({selectedAbsent.length})</h3>
           {selectedAbsent.length
-            ? <div className="tablewrap"><table><tbody>{selectedAbsent.map(x=><tr key={x.id}><td>{x.full_name}</td><td><span className="tag absent">Absent</span></td></tr>)}</tbody></table></div>
+            ? <div className="tablewrap"><table className="absent-table"><tbody>{selectedAbsent.map(x=><tr key={x.id}><td>{x.full_name}</td><td><span className="tag absent">Absent</span></td></tr>)}</tbody></table></div>
             : <div className="empty">Nobody absent on this date.</div>}
         </div>
         <div>
           <h3>Present ({selectedPresent.length})</h3>
           {selectedPresent.length
-            ? <div className="tablewrap"><table><thead><tr><th>Name</th><th>Marked</th><th>Approved time</th><th>Status</th></tr></thead><tbody>{selectedPresent.map(x=><tr key={x.id}><td>{x.full_name}</td><td>{x.marked_at}</td><td>{x.cutoff_used||"—"}</td><td><span className={"tag "+(x.status==="late"?"late":"present")}>{x.status==="late"?lateDetail(x):"On time"}</span></td></tr>)}</tbody></table></div>
+            ? <div className="tablewrap"><table className="present-table"><thead><tr><th>Name</th><th>Marked</th><th>Approved time</th><th>Status</th></tr></thead><tbody>{selectedPresent.map(x=><tr key={x.id}><td>{x.full_name}</td><td>{x.marked_at}</td><td>{x.cutoff_used||"—"}</td><td><span className={"tag "+(x.status==="late"?"late":"present")}>{x.status==="late"?lateDetail(x):"On time"}</span></td></tr>)}</tbody></table></div>
             : <div className="empty">Nobody present on this date.</div>}
         </div>
       </div>
@@ -144,7 +144,7 @@ export default function AdminClient(){
 
     <section className="card" style={{marginTop:16}}>
       <div className="split"><div><p className="muted small">MONTHLY REGISTER</p><h2>Attendance performance</h2></div><input type="month" className="input" style={{maxWidth:190}} value={month} onChange={e=>setMonth(e.target.value)}/></div>
-      {loading?<div className="empty">Loading register…</div>:<div className="tablewrap"><table><thead><tr><th>Name</th><th>Present</th><th>Absent</th><th>Late</th><th>Total late mins</th><th>Avg late mins</th><th>Attendance</th><th>Status</th><th></th></tr></thead><tbody>{data?.members.map(m=><tr key={m.id}><td>{m.full_name}</td><td>{m.days_present}</td><td>{m.days_absent}</td><td>{m.late_count}</td><td>{m.total_minutes_late}</td><td>{m.late_count?m.avg_minutes_late:0}</td><td>{m.attendance_pct}%</td><td>{m.active?<span className="tag present">Active</span>:<span className="tag absent">Inactive</span>}</td><td><button className="button secondary" onClick={()=>toggleMember(m.id,!m.active)}>{m.active?"Deactivate":"Reactivate"}</button></td></tr>)}</tbody></table></div>}
+      {loading?<div className="empty">Loading register…</div>:<div className="tablewrap"><table className="monthly-table"><thead><tr><th>Name</th><th>Present</th><th>Absent</th><th>Late</th><th>Total late mins</th><th>Avg late mins</th><th>Attendance</th><th>Status</th><th></th></tr></thead><tbody>{data?.members.map(m=><tr key={m.id}><td>{m.full_name}</td><td>{m.days_present}</td><td>{m.days_absent}</td><td>{m.late_count}</td><td>{m.total_minutes_late}</td><td>{m.late_count?m.avg_minutes_late:0}</td><td>{m.attendance_pct}%</td><td>{m.active?<span className="tag present">Active</span>:<span className="tag absent">Inactive</span>}</td><td><button className="button secondary" onClick={()=>toggleMember(m.id,!m.active)}>{m.active?"Deactivate":"Reactivate"}</button></td></tr>)}</tbody></table></div>}
     </section>
   </main>
 }
