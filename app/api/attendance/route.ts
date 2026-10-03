@@ -17,21 +17,20 @@ export async function POST(req:Request){
     const members=await sql`SELECT id,full_name FROM attendance_members WHERE active=true AND lower(full_name)=lower(${name}) LIMIT 1`;
     if(!members[0]) return NextResponse.json({message:"That name is not on the active register. Ask the admin."},{status:404});
 
-    const existing=await sql`
-      SELECT marked_at, status FROM attendance_marks
-      WHERE member_id=${members[0].id}
-      AND attendance_date=(now() AT TIME ZONE 'Africa/Lagos')::date
-      LIMIT 1
-    `;
-    if(existing[0]) return NextResponse.json({message:"You have already marked attendance today."},{status:409});
-
     const nowLocal=await sql`SELECT to_char(now() AT TIME ZONE 'Africa/Lagos','HH24:MI') AS hm`;
     const status=String(nowLocal[0].hm)>String(s.cutoff_time).slice(0,5)?"late":"on_time";
-    await sql`
+
+    const inserted=await sql`
       INSERT INTO attendance_marks(member_id,attendance_date,marked_at,status)
       VALUES(${members[0].id},(now() AT TIME ZONE 'Africa/Lagos')::date,now(),${status})
       ON CONFLICT(member_id,attendance_date) DO NOTHING
+      RETURNING id
     `;
+
+    if(!inserted[0]){
+      return NextResponse.json({message:"You have already marked attendance today."},{status:409});
+    }
+
     return NextResponse.json({message:status==="late"?"Attendance marked. You were recorded as late.":"Attendance marked successfully."});
   }catch(e){
     console.error(e);
