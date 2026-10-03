@@ -26,3 +26,5 @@ Run npm install, add the environment variables in .env.local, then run npm run d
 
 
 - Mobile admin category dashboard: monthly Members / Present / Absent / Late cards with expandable member details.
+
+<!-- vercel reconnect test 1791016119289 -->
