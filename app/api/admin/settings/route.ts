@@ -39,11 +39,32 @@ export async function POST(req:Request){
               updated_at=now()
           WHERE id=1
         `;
+        await sql`
+          INSERT INTO attendance_sessions(attendance_date,opened_at,cutoff_used,code_used,last_opened_at,manually_closed_at)
+          SELECT
+            (now() AT TIME ZONE 'Africa/Lagos')::date,
+            now(),
+            cutoff_time,
+            current_code,
+            now(),
+            NULL
+          FROM attendance_settings WHERE id=1
+          ON CONFLICT(attendance_date) DO UPDATE
+          SET last_opened_at=now(),
+              cutoff_used=EXCLUDED.cutoff_used,
+              code_used=EXCLUDED.code_used,
+              manually_closed_at=NULL
+        `;
       }else{
         await sql`
           UPDATE attendance_settings
           SET is_open=false,reopen_override_date=NULL,updated_at=now()
           WHERE id=1
+        `;
+        await sql`
+          UPDATE attendance_sessions
+          SET manually_closed_at=now()
+          WHERE attendance_date=(now() AT TIME ZONE 'Africa/Lagos')::date
         `;
       }
     }
