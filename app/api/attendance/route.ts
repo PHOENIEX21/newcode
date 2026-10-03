@@ -17,12 +17,29 @@ export async function POST(req:Request){
     const members=await sql`SELECT id,full_name FROM attendance_members WHERE active=true AND lower(full_name)=lower(${name}) LIMIT 1`;
     if(!members[0]) return NextResponse.json({message:"That name is not on the active register. Ask the admin."},{status:404});
 
-    const nowLocal=await sql`SELECT to_char(now() AT TIME ZONE 'Africa/Lagos','HH24:MI') AS hm`;
-    const status=String(nowLocal[0].hm)>String(s.cutoff_time).slice(0,5)?"late":"on_time";
+    const local=await sql`
+      SELECT
+        to_char(now() AT TIME ZONE 'Africa/Lagos','HH24:MI') AS hm,
+        GREATEST(
+          0,
+          FLOOR(EXTRACT(EPOCH FROM (
+            (now() AT TIME ZONE 'Africa/Lagos')::time - ${String(s.cutoff_time).slice(0,8)}::time
+          )) / 60)
+        )::int AS minutes_late
+    `;
+    const minutesLate=Number(local[0].minutes_late||0);
+    const status=minutesLate>0?"late":"on_time";
 
     const inserted=await sql`
-      INSERT INTO attendance_marks(member_id,attendance_date,marked_at,status)
-      VALUES(${members[0].id},(now() AT TIME ZONE 'Africa/Lagos')::date,now(),${status})
+      INSERT INTO attendance_marks(member_id,attendance_date,marked_at,status,cutoff_used,minutes_late)
+      VALUES(
+        ${members[0].id},
+        (now() AT TIME ZONE 'Africa/Lagos')::date,
+        now(),
+        ${status},
+        ${String(s.cutoff_time).slice(0,8)}::time,
+        ${minutesLate}
+      )
       ON CONFLICT(member_id,attendance_date) DO NOTHING
       RETURNING id
     `;
@@ -31,7 +48,11 @@ export async function POST(req:Request){
       return NextResponse.json({message:"You have already marked attendance today."},{status:409});
     }
 
-    return NextResponse.json({message:status==="late"?"Attendance marked. You were recorded as late.":"Attendance marked successfully."});
+    return NextResponse.json({
+      message:status==="late"
+        ? `Attendance marked. You were recorded as ${minutesLate} minute${minutesLate===1?"":"s"} late.`
+        :"Attendance marked successfully."
+    });
   }catch(e){
     console.error(e);
     return NextResponse.json({message:"Attendance could not be recorded. Please try again."},{status:500});
