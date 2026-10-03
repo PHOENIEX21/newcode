@@ -23,3 +23,6 @@ The PostgreSQL tables and indexes are created automatically on first use.
 
 ## Local start
 Run npm install, add the environment variables in .env.local, then run npm run dev.
+
+
+- Mobile admin category dashboard: monthly Members / Present / Absent / Late cards with expandable member details.
