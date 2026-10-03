@@ -165,3 +165,7 @@
   .mobile-admin-menu{grid-template-columns:1fr}
   .admin-menu-card{min-height:108px}
 }
+
+html{scroll-behavior:smooth}
+.section-anchor{scroll-margin-top:12px}
+#admin-categories{scroll-margin-top:12px}
