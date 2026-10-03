@@ -52,6 +52,13 @@ export async function GET(req:Request){
       ORDER BY m.full_name
     `;
 
+    const selectedSessionRows=await sql`
+      SELECT EXISTS(
+        SELECT 1 FROM attendance_sessions WHERE attendance_date=${selectedDate}::date
+      ) AS exists
+    `;
+    const selectedSessionExists=Boolean(selectedSessionRows[0]?.exists);
+
     const selectedRows=await sql`
       SELECT m.id,m.full_name,a.marked_at,a.status,a.cutoff_used::text,a.minutes_late
       FROM attendance_sessions s
@@ -117,7 +124,7 @@ export async function GET(req:Request){
       month,
       date:today,
       active_member_count:activeMemberCount,
-      selected_session_exists:selectedRows.length>0
+      selected_session_exists:selectedSessionExists
     });
   }catch(e){
     console.error(e);
