@@ -19,7 +19,18 @@ export async function GET(req:Request){
     const {start,end,days}=monthBounds(month);
     const sql=await db();
 
-    const settings=(await sql`SELECT current_code,is_open,cutoff_time::text FROM attendance_settings WHERE id=1`)[0];
+    const settings=(await sql`
+      SELECT current_code,is_open,cutoff_time::text,auto_close_time::text,reopen_override_date,
+        (now() AT TIME ZONE 'Africa/Lagos')::date AS today,
+        (now() AT TIME ZONE 'Africa/Lagos')::time AS now_time
+      FROM attendance_settings WHERE id=1
+    `)[0];
+    const reopened=String(settings?.reopen_override_date||"")===String(settings?.today||"");
+    const expired=String(settings?.now_time||"00:00:00").slice(0,8)>=String(settings?.auto_close_time||"10:00:00").slice(0,8);
+    settings.effective_open=Boolean(settings?.is_open)&&(!expired||reopened);
+    settings.expired=expired&&!reopened;
+    settings.reopened=reopened;
+    settings.auto_close_time=String(settings?.auto_close_time||"10:00:00").slice(0,5);
 
     const todayRows=await sql`
       SELECT m.id,m.full_name,a.marked_at,a.status,a.cutoff_used::text,a.minutes_late
