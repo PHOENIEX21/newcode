@@ -2,13 +2,23 @@
 import { useEffect, useMemo, useState } from "react";
 
 type Member={id:number;full_name:string;active:boolean;days_present:number;days_absent:number;late_count:number;attendance_pct:number};
-type TodayRow={id:number;full_name:string;marked_at:string|null;status:"on_time"|"late"|null};
-type Dashboard={settings:{current_code:string;is_open:boolean;cutoff_time:string};members:Member[];today:TodayRow[];month:string;date:string};
+type DayRow={id:number;full_name:string;marked_at:string|null;status:"on_time"|"late"|null};
+type Dashboard={
+  settings:{current_code:string;is_open:boolean;cutoff_time:string};
+  members:Member[];
+  today:DayRow[];
+  selectedDay:DayRow[];
+  selectedDate:string;
+  month:string;
+  date:string
+};
 
 export default function AdminClient(){
   const now=new Date();
   const defaultMonth=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
+  const defaultDate=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
   const [month,setMonth]=useState(defaultMonth);
+  const [selectedDate,setSelectedDate]=useState(defaultDate);
   const [data,setData]=useState<Dashboard|null>(null);
   const [newName,setNewName]=useState("");
   const [code,setCode]=useState("");
@@ -16,29 +26,54 @@ export default function AdminClient(){
   const [msg,setMsg]=useState("");
   const [loading,setLoading]=useState(true);
 
-  async function load(m=month){
+  async function load(m=month,d=selectedDate){
     setLoading(true);
-    const r=await fetch(`/api/admin/dashboard?month=${encodeURIComponent(m)}`,{cache:"no-store"});
+    const r=await fetch(`/api/admin/dashboard?month=${encodeURIComponent(m)}&date=${encodeURIComponent(d)}`,{cache:"no-store"});
     if(r.status===401){location.href="/admin/login";return}
-    const j=await r.json(); setData(j); setCode(j.settings.current_code); setCutoff(String(j.settings.cutoff_time).slice(0,5)); setLoading(false);
+    const j=await r.json();
+    setData(j);
+    setCode(j.settings.current_code);
+    setCutoff(String(j.settings.cutoff_time).slice(0,5));
+    setLoading(false);
   }
-  useEffect(()=>{load(month)},[month]);
+
+  useEffect(()=>{load(month,selectedDate)},[month,selectedDate]);
 
   async function settings(patch:Record<string,unknown>){
     setMsg("");
     const r=await fetch("/api/admin/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(patch)});
-    const j=await r.json(); setMsg(j.message||"Updated."); if(r.ok) await load();
+    const j=await r.json();
+    setMsg(j.message||"Updated.");
+    if(r.ok) await load();
   }
-  async function addMember(e:React.FormEvent){e.preventDefault();const r=await fetch("/api/admin/members",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({full_name:newName})});const j=await r.json();setMsg(j.message);if(r.ok){setNewName("");await load()}}
-  async function toggleMember(id:number,active:boolean){const r=await fetch("/api/admin/members",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,active})});const j=await r.json();setMsg(j.message);if(r.ok)await load()}
+
+  async function addMember(e:React.FormEvent){
+    e.preventDefault();
+    const r=await fetch("/api/admin/members",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({full_name:newName})});
+    const j=await r.json();
+    setMsg(j.message);
+    if(r.ok){setNewName("");await load()}
+  }
+
+  async function toggleMember(id:number,active:boolean){
+    const r=await fetch("/api/admin/members",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,active})});
+    const j=await r.json();
+    setMsg(j.message);
+    if(r.ok)await load()
+  }
 
   const present=useMemo(()=>data?.today.filter(x=>x.marked_at)||[],[data]);
   const absent=useMemo(()=>data?.today.filter(x=>!x.marked_at)||[],[data]);
   const late=useMemo(()=>data?.today.filter(x=>x.status==="late")||[],[data]);
 
+  const selectedPresent=useMemo(()=>data?.selectedDay?.filter(x=>x.marked_at)||[],[data]);
+  const selectedAbsent=useMemo(()=>data?.selectedDay?.filter(x=>!x.marked_at)||[],[data]);
+  const selectedLate=useMemo(()=>data?.selectedDay?.filter(x=>x.status==="late")||[],[data]);
+
   return <main className="shell">
     <div className="topbar"><div><div className="brand">Morning Meeting Attendance</div><div className="muted small">Admin dashboard</div></div><form action="/api/admin/logout" method="post"><button className="button secondary">Sign out</button></form></div>
     {msg&&<div className="notice ok" style={{marginBottom:16}}>{msg}</div>}
+
     <section className="stats">
       <div className="stat"><span className="muted small">Present today</span><b>{present.length}</b></div>
       <div className="stat"><span className="muted small">Absent today</span><b>{absent.length}</b></div>
@@ -55,6 +90,7 @@ export default function AdminClient(){
           <div className="actions"><button className="button" onClick={()=>settings({is_open:!data?.settings.is_open})}>{data?.settings.is_open?"Close attendance":"Open attendance"}</button></div>
         </div>
       </div>
+
       <div className="card">
         <p className="muted small">MEMBERS</p><h2>Add a member</h2>
         <form className="form" onSubmit={addMember}><div className="field"><label>Full name</label><input className="input" value={newName} onChange={e=>setNewName(e.target.value)} placeholder="e.g. Musa Ibrahim" required/></div><button className="button">Add to register</button></form>
@@ -67,6 +103,35 @@ export default function AdminClient(){
       <div className="grid2">
         <div><h3>Absent ({absent.length})</h3>{absent.length?<div className="tablewrap"><table><tbody>{absent.map(x=><tr key={x.id}><td>{x.full_name}</td><td><span className="tag absent">Absent</span></td></tr>)}</tbody></table></div>:<div className="empty">Nobody absent.</div>}</div>
         <div><h3>Present ({present.length})</h3>{present.length?<div className="tablewrap"><table><tbody>{present.map(x=><tr key={x.id}><td>{x.full_name}</td><td>{x.marked_at}</td><td><span className={"tag "+(x.status==="late"?"late":"present")}>{x.status==="late"?"Late":"Present"}</span></td></tr>)}</tbody></table></div>:<div className="empty">No one has marked yet.</div>}</div>
+      </div>
+    </section>
+
+    <section className="card" style={{marginTop:16}}>
+      <div className="split">
+        <div><p className="muted small">DAILY HISTORY</p><h2>View attendance by date</h2></div>
+        <input type="date" className="input" style={{maxWidth:190}} value={selectedDate} max={data?.date||undefined} onChange={e=>setSelectedDate(e.target.value)}/>
+      </div>
+
+      <div className="stats" style={{marginTop:16}}>
+        <div className="stat"><span className="muted small">Present</span><b>{selectedPresent.length}</b></div>
+        <div className="stat"><span className="muted small">Absent</span><b>{selectedAbsent.length}</b></div>
+        <div className="stat"><span className="muted small">Late</span><b>{selectedLate.length}</b></div>
+        <div className="stat"><span className="muted small">Date</span><b style={{fontSize:18}}>{data?.selectedDate||selectedDate}</b></div>
+      </div>
+
+      <div className="grid2" style={{marginTop:16}}>
+        <div>
+          <h3>Absent ({selectedAbsent.length})</h3>
+          {selectedAbsent.length
+            ? <div className="tablewrap"><table><tbody>{selectedAbsent.map(x=><tr key={x.id}><td>{x.full_name}</td><td><span className="tag absent">Absent</span></td></tr>)}</tbody></table></div>
+            : <div className="empty">Nobody absent on this date.</div>}
+        </div>
+        <div>
+          <h3>Present ({selectedPresent.length})</h3>
+          {selectedPresent.length
+            ? <div className="tablewrap"><table><thead><tr><th>Name</th><th>Time</th><th>Status</th></tr></thead><tbody>{selectedPresent.map(x=><tr key={x.id}><td>{x.full_name}</td><td>{x.marked_at}</td><td><span className={"tag "+(x.status==="late"?"late":"present")}>{x.status==="late"?"Late":"Present"}</span></td></tr>)}</tbody></table></div>
+            : <div className="empty">Nobody present on this date.</div>}
+        </div>
       </div>
     </section>
 
