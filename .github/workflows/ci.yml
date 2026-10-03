@@ -1,0 +1,21 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm install
+      - run: npm run build
+        env:
+          DATABASE_URL: postgresql://placeholder:placeholder@localhost:5432/placeholder
+          ADMIN_PASSWORD: ci-placeholder
+          ADMIN_SESSION_SECRET: ci-placeholder-secret-that-is-long-enough
