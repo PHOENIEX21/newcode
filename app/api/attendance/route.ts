@@ -9,9 +9,17 @@ export async function POST(req:Request){
     if(!name||!/^\d{4}$/.test(code)) return NextResponse.json({message:"Enter your name and the 4-digit meeting code."},{status:400});
 
     const sql=await db();
-    const settings=await sql`SELECT current_code,is_open,cutoff_time::text FROM attendance_settings WHERE id=1`;
+    const settings=await sql`
+      SELECT current_code,is_open,cutoff_time::text,auto_close_time::text,reopen_override_date,
+        (now() AT TIME ZONE 'Africa/Lagos')::date AS today,
+        (now() AT TIME ZONE 'Africa/Lagos')::time AS now_time
+      FROM attendance_settings WHERE id=1
+    `;
     const s=settings[0];
-    if(!s?.is_open) return NextResponse.json({message:"Attendance is closed. Ask the agent if you have just arrived."},{status:403});
+    const reopened=String(s?.reopen_override_date||"")===String(s?.today||"");
+    const beforeAutoClose=String(s?.now_time||"00:00:00").slice(0,8)<String(s?.auto_close_time||"10:00:00").slice(0,8);
+    const effectiveOpen=Boolean(s?.is_open)&&(beforeAutoClose||reopened);
+    if(!effectiveOpen) return NextResponse.json({message:"Attendance is closed for today. Ask the admin if it needs to be reopened."},{status:403});
     if(code!==s.current_code) return NextResponse.json({message:"Wrong code. Ask the agent."},{status:403});
 
     const members=await sql`SELECT id,full_name FROM attendance_members WHERE active=true AND lower(full_name)=lower(${name}) LIMIT 1`;
