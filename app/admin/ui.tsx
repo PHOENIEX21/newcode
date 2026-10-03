@@ -1,0 +1,78 @@
+"use client";
+import { useEffect, useMemo, useState } from "react";
+
+type Member={id:number;full_name:string;active:boolean;days_present:number;days_absent:number;late_count:number;attendance_pct:number};
+type TodayRow={id:number;full_name:string;marked_at:string|null;status:"on_time"|"late"|null};
+type Dashboard={settings:{current_code:string;is_open:boolean;cutoff_time:string};members:Member[];today:TodayRow[];month:string;date:string};
+
+export default function AdminClient(){
+  const now=new Date();
+  const defaultMonth=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
+  const [month,setMonth]=useState(defaultMonth);
+  const [data,setData]=useState<Dashboard|null>(null);
+  const [newName,setNewName]=useState("");
+  const [code,setCode]=useState("");
+  const [cutoff,setCutoff]=useState("07:15");
+  const [msg,setMsg]=useState("");
+  const [loading,setLoading]=useState(true);
+
+  async function load(m=month){
+    setLoading(true);
+    const r=await fetch(`/api/admin/dashboard?month=${encodeURIComponent(m)}`,{cache:"no-store"});
+    if(r.status===401){location.href="/admin/login";return}
+    const j=await r.json(); setData(j); setCode(j.settings.current_code); setCutoff(String(j.settings.cutoff_time).slice(0,5)); setLoading(false);
+  }
+  useEffect(()=>{load(month)},[month]);
+
+  async function settings(patch:Record<string,unknown>){
+    setMsg("");
+    const r=await fetch("/api/admin/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(patch)});
+    const j=await r.json(); setMsg(j.message||"Updated."); if(r.ok) await load();
+  }
+  async function addMember(e:React.FormEvent){e.preventDefault();const r=await fetch("/api/admin/members",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({full_name:newName})});const j=await r.json();setMsg(j.message);if(r.ok){setNewName("");await load()}}
+  async function toggleMember(id:number,active:boolean){const r=await fetch("/api/admin/members",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,active})});const j=await r.json();setMsg(j.message);if(r.ok)await load()}
+
+  const present=useMemo(()=>data?.today.filter(x=>x.marked_at)||[],[data]);
+  const absent=useMemo(()=>data?.today.filter(x=>!x.marked_at)||[],[data]);
+  const late=useMemo(()=>data?.today.filter(x=>x.status==="late")||[],[data]);
+
+  return <main className="shell">
+    <div className="topbar"><div><div className="brand">Morning Meeting Attendance</div><div className="muted small">Admin dashboard</div></div><form action="/api/admin/logout" method="post"><button className="button secondary">Sign out</button></form></div>
+    {msg&&<div className="notice ok" style={{marginBottom:16}}>{msg}</div>}
+    <section className="stats">
+      <div className="stat"><span className="muted small">Present today</span><b>{present.length}</b></div>
+      <div className="stat"><span className="muted small">Absent today</span><b>{absent.length}</b></div>
+      <div className="stat"><span className="muted small">Late today</span><b>{late.length}</b></div>
+      <div className="stat"><span className="muted small">Active members</span><b>{data?.today.length??0}</b></div>
+    </section>
+
+    <section className="grid2" style={{marginTop:16}}>
+      <div className="card">
+        <div className="split"><div><p className="muted small">TODAY&apos;S SESSION</p><h2>{data?.settings.is_open?"Attendance is open":"Attendance is closed"}</h2></div><span className="pill"><span className={"dot "+(data?.settings.is_open?"open":"")}/>{data?.date||"Today"}</span></div>
+        <div className="form">
+          <div className="field"><label>4-digit code</label><div className="actions"><input className="input" style={{maxWidth:180}} value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,"").slice(0,4))} inputMode="numeric"/><button className="button" onClick={()=>settings({code})}>Save code</button><button className="button secondary" onClick={()=>{const c=String(Math.floor(1000+Math.random()*9000));setCode(c);settings({code:c})}}>Generate</button></div></div>
+          <div className="field"><label>Late after</label><div className="actions"><input type="time" className="input" style={{maxWidth:180}} value={cutoff} onChange={e=>setCutoff(e.target.value)}/><button className="button secondary" onClick={()=>settings({cutoff})}>Update cut-off</button></div></div>
+          <div className="actions"><button className="button" onClick={()=>settings({is_open:!data?.settings.is_open})}>{data?.settings.is_open?"Close attendance":"Open attendance"}</button></div>
+        </div>
+      </div>
+      <div className="card">
+        <p className="muted small">MEMBERS</p><h2>Add a member</h2>
+        <form className="form" onSubmit={addMember}><div className="field"><label>Full name</label><input className="input" value={newName} onChange={e=>setNewName(e.target.value)} placeholder="e.g. Musa Ibrahim" required/></div><button className="button">Add to register</button></form>
+        <p className="muted small" style={{marginTop:16}}>Names immediately become available on the attendance form.</p>
+      </div>
+    </section>
+
+    <section className="card" style={{marginTop:16}}>
+      <div className="split"><div><p className="muted small">DAILY CHECK</p><h2>Today at a glance</h2></div><a className="button secondary" href={`/api/admin/export?month=${month}`}>Export month CSV</a></div>
+      <div className="grid2">
+        <div><h3>Absent ({absent.length})</h3>{absent.length?<div className="tablewrap"><table><tbody>{absent.map(x=><tr key={x.id}><td>{x.full_name}</td><td><span className="tag absent">Absent</span></td></tr>)}</tbody></table></div>:<div className="empty">Nobody absent.</div>}</div>
+        <div><h3>Present ({present.length})</h3>{present.length?<div className="tablewrap"><table><tbody>{present.map(x=><tr key={x.id}><td>{x.full_name}</td><td>{x.marked_at}</td><td><span className={"tag "+(x.status==="late"?"late":"present")}>{x.status==="late"?"Late":"Present"}</span></td></tr>)}</tbody></table></div>:<div className="empty">No one has marked yet.</div>}</div>
+      </div>
+    </section>
+
+    <section className="card" style={{marginTop:16}}>
+      <div className="split"><div><p className="muted small">MONTHLY REGISTER</p><h2>Attendance performance</h2></div><input type="month" className="input" style={{maxWidth:190}} value={month} onChange={e=>setMonth(e.target.value)}/></div>
+      {loading?<div className="empty">Loading register…</div>:<div className="tablewrap"><table><thead><tr><th>Name</th><th>Present</th><th>Absent</th><th>Late</th><th>Attendance</th><th>Status</th><th></th></tr></thead><tbody>{data?.members.map(m=><tr key={m.id}><td>{m.full_name}</td><td>{m.days_present}</td><td>{m.days_absent}</td><td>{m.late_count}</td><td>{m.attendance_pct}%</td><td>{m.active?<span className="tag present">Active</span>:<span className="tag absent">Inactive</span>}</td><td><button className="button secondary" onClick={()=>toggleMember(m.id,!m.active)}>{m.active?"Deactivate":"Reactivate"}</button></td></tr>)}</tbody></table></div>}
+    </section>
+  </main>
+}
