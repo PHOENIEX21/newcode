@@ -31,6 +31,7 @@ export default function AdminClient(){
   const [showHistoryAbsent,setShowHistoryAbsent]=useState(false);
   const [showHistoryPresent,setShowHistoryPresent]=useState(false);
   const [expandedMember,setExpandedMember]=useState<number|null>(null);
+  const [monthlyCategory,setMonthlyCategory]=useState<"all"|"present"|"absent"|"late">("all");
 
   async function load(m=month,d=selectedDate){
     setLoading(true);
@@ -75,6 +76,24 @@ export default function AdminClient(){
   const selectedPresent=useMemo(()=>data?.selectedDay?.filter(x=>x.marked_at)||[],[data]);
   const selectedAbsent=useMemo(()=>data?.selectedDay?.filter(x=>!x.marked_at)||[],[data]);
   const selectedLate=useMemo(()=>data?.selectedDay?.filter(x=>x.status==="late")||[],[data]);
+
+  const monthlyTotals=useMemo(()=>{
+    const members=data?.members||[];
+    return {
+      members:members.length,
+      present:members.reduce((sum,m)=>sum+m.days_present,0),
+      absent:members.reduce((sum,m)=>sum+m.days_absent,0),
+      late:members.reduce((sum,m)=>sum+m.late_count,0)
+    };
+  },[data]);
+
+  const monthlyMembers=useMemo(()=>{
+    const members=data?.members||[];
+    if(monthlyCategory==="present") return members.filter(m=>m.days_present>0);
+    if(monthlyCategory==="absent") return members.filter(m=>m.days_absent>0);
+    if(monthlyCategory==="late") return members.filter(m=>m.late_count>0);
+    return members;
+  },[data,monthlyCategory]);
 
   const lateDetail=(x:DayRow)=>{
     if(x.status!=="late") return "";
@@ -153,7 +172,25 @@ export default function AdminClient(){
       <div className="split"><div><p className="muted small">MONTHLY REGISTER</p><h2>Attendance performance</h2></div><input type="month" className="input" style={{maxWidth:190}} value={month} onChange={e=>setMonth(e.target.value)}/></div>
       {loading?<div className="empty">Loading register…</div>:<>
         <div className="tablewrap desktop-monthly"><table className="monthly-table"><thead><tr><th>Name</th><th>Present</th><th>Absent</th><th>Late</th><th>Total late mins</th><th>Avg late mins</th><th>Attendance</th><th>Status</th><th></th></tr></thead><tbody>{data?.members.map(m=><tr key={m.id}><td>{m.full_name}</td><td>{m.days_present}</td><td>{m.days_absent}</td><td>{m.late_count}</td><td>{m.total_minutes_late}</td><td>{m.late_count?m.avg_minutes_late:0}</td><td>{m.attendance_pct}%</td><td>{m.active?<span className="tag present">Active</span>:<span className="tag absent">Inactive</span>}</td><td><button className="button secondary" onClick={()=>toggleMember(m.id,!m.active)}>{m.active?"Deactivate":"Reactivate"}</button></td></tr>)}</tbody></table></div>
-        <div className="mobile-monthly">{data?.members.map(m=>{
+        <div className="mobile-monthly">
+          <div className="monthly-categories">
+            <button className={"monthly-category "+(monthlyCategory==="all"?"active":"")} onClick={()=>{setMonthlyCategory("all");setExpandedMember(null)}}>
+              <span>Members</span><b>{monthlyTotals.members}</b><small>View everyone</small>
+            </button>
+            <button className={"monthly-category present "+(monthlyCategory==="present"?"active":"")} onClick={()=>{setMonthlyCategory("present");setExpandedMember(null)}}>
+              <span>Present</span><b>{monthlyTotals.present}</b><small>Total attendance marks</small>
+            </button>
+            <button className={"monthly-category absent "+(monthlyCategory==="absent"?"active":"")} onClick={()=>{setMonthlyCategory("absent");setExpandedMember(null)}}>
+              <span>Absent</span><b>{monthlyTotals.absent}</b><small>Total missed days</small>
+            </button>
+            <button className={"monthly-category late "+(monthlyCategory==="late"?"active":"")} onClick={()=>{setMonthlyCategory("late");setExpandedMember(null)}}>
+              <span>Late</span><b>{monthlyTotals.late}</b><small>Total late arrivals</small>
+            </button>
+          </div>
+          <div className="monthly-filter-head">
+            <div><b>{monthlyCategory==="all"?"All members":monthlyCategory==="present"?"Members with attendance":monthlyCategory==="absent"?"Members with absences":"Members late this month"}</b><small>{monthlyMembers.length} member{monthlyMembers.length===1?"":"s"}</small></div>
+          </div>
+          {monthlyMembers.map(m=>{
           const open=expandedMember===m.id;
           return <div className="member-summary" key={m.id}>
             <button className="member-summary-head" onClick={()=>setExpandedMember(open?null:m.id)}>
@@ -172,7 +209,9 @@ export default function AdminClient(){
               <button className="button secondary" onClick={()=>toggleMember(m.id,!m.active)}>{m.active?"Deactivate member":"Reactivate member"}</button>
             </div>}
           </div>
-        })}</div>
+        })}
+        {monthlyMembers.length===0&&<div className="empty monthly-empty">No members in this category for the selected month.</div>}
+        </div>
       </>}
     </section>
   </main>
