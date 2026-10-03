@@ -26,6 +26,10 @@ export default function AdminClient(){
   const [cutoff,setCutoff]=useState("07:15");
   const [msg,setMsg]=useState("");
   const [loading,setLoading]=useState(true);
+  const [showTodayAbsent,setShowTodayAbsent]=useState(false);
+  const [showTodayPresent,setShowTodayPresent]=useState(false);
+  const [showHistoryAbsent,setShowHistoryAbsent]=useState(false);
+  const [showHistoryPresent,setShowHistoryPresent]=useState(false);
 
   async function load(m=month,d=selectedDate){
     setLoading(true);
@@ -108,8 +112,8 @@ export default function AdminClient(){
     <section className="card" style={{marginTop:16}}>
       <div className="split"><div><p className="muted small">DAILY CHECK</p><h2>Today at a glance</h2></div><a className="button secondary" href={`/api/admin/export?month=${month}`}>Export month CSV</a></div>
       <div className="grid2">
-        <div><h3>Absent ({absent.length})</h3>{absent.length?<div className="tablewrap"><table className="absent-table"><tbody>{absent.map(x=><tr key={x.id}><td>{x.full_name}</td><td><span className="tag absent">Absent</span></td></tr>)}</tbody></table></div>:<div className="empty">Nobody absent.</div>}</div>
-        <div><h3>Present ({present.length})</h3>{present.length?<div className="tablewrap"><table className="present-table"><thead><tr><th>Name</th><th>Marked</th><th>Cut-off</th><th>Status</th></tr></thead><tbody>{present.map(x=><tr key={x.id}><td>{x.full_name}</td><td>{x.marked_at}</td><td>{x.cutoff_used||String(data?.settings.cutoff_time||"").slice(0,5)}</td><td><span className={"tag "+(x.status==="late"?"late":"present")}>{x.status==="late"?lateDetail(x):"On time"}</span></td></tr>)}</tbody></table></div>:<div className="empty">No one has marked yet.</div>}</div>
+        <div><h3>Absent ({absent.length})</h3>{absent.length?<div className="tablewrap"><table className={"absent-table compact-list "+(showTodayAbsent?"expanded":"collapsed")}><tbody>{absent.map(x=><tr key={x.id}><td>{x.full_name}</td><td><span className="tag absent">Absent</span></td></tr>)}</tbody></table></div>:<div className="empty">Nobody absent.</div>}{absent.length>2&&<button className="button secondary mobile-list-toggle" onClick={()=>setShowTodayAbsent(v=>!v)}>{showTodayAbsent?"Close list":`View all (${absent.length})`}</button>}</div>
+        <div><h3>Present ({present.length})</h3>{present.length?<div className="tablewrap"><table className={"present-table compact-list "+(showTodayPresent?"expanded":"collapsed")}><thead><tr><th>Name</th><th>Marked</th><th>Cut-off</th><th>Status</th></tr></thead><tbody>{present.map(x=><tr key={x.id}><td>{x.full_name}</td><td>{x.marked_at}</td><td>{x.cutoff_used||String(data?.settings.cutoff_time||"").slice(0,5)}</td><td><span className={"tag "+(x.status==="late"?"late":"present")}>{x.status==="late"?lateDetail(x):"On time"}</span></td></tr>)}</tbody></table></div>:<div className="empty">No one has marked yet.</div>}{present.length>2&&<button className="button secondary mobile-list-toggle" onClick={()=>setShowTodayPresent(v=>!v)}>{showTodayPresent?"Close list":`View all (${present.length})`}</button>}</div>
       </div>
     </section>
 
@@ -130,14 +134,16 @@ export default function AdminClient(){
         <div>
           <h3>Absent ({selectedAbsent.length})</h3>
           {selectedAbsent.length
-            ? <div className="tablewrap"><table className="absent-table"><tbody>{selectedAbsent.map(x=><tr key={x.id}><td>{x.full_name}</td><td><span className="tag absent">Absent</span></td></tr>)}</tbody></table></div>
+            ? <div className="tablewrap"><table className={"absent-table compact-list "+(showHistoryAbsent?"expanded":"collapsed")}><tbody>{selectedAbsent.map(x=><tr key={x.id}><td>{x.full_name}</td><td><span className="tag absent">Absent</span></td></tr>)}</tbody></table></div>
             : <div className="empty">Nobody absent on this date.</div>}
+          {selectedAbsent.length>2&&<button className="button secondary mobile-list-toggle" onClick={()=>setShowHistoryAbsent(v=>!v)}>{showHistoryAbsent?"Close list":`View all (${selectedAbsent.length})`}</button>}
         </div>
         <div>
           <h3>Present ({selectedPresent.length})</h3>
           {selectedPresent.length
-            ? <div className="tablewrap"><table className="present-table"><thead><tr><th>Name</th><th>Marked</th><th>Approved time</th><th>Status</th></tr></thead><tbody>{selectedPresent.map(x=><tr key={x.id}><td>{x.full_name}</td><td>{x.marked_at}</td><td>{x.cutoff_used||"—"}</td><td><span className={"tag "+(x.status==="late"?"late":"present")}>{x.status==="late"?lateDetail(x):"On time"}</span></td></tr>)}</tbody></table></div>
+            ? <div className="tablewrap"><table className={"present-table compact-list "+(showHistoryPresent?"expanded":"collapsed")}><thead><tr><th>Name</th><th>Marked</th><th>Approved time</th><th>Status</th></tr></thead><tbody>{selectedPresent.map(x=><tr key={x.id}><td>{x.full_name}</td><td>{x.marked_at}</td><td>{x.cutoff_used||"—"}</td><td><span className={"tag "+(x.status==="late"?"late":"present")}>{x.status==="late"?lateDetail(x):"On time"}</span></td></tr>)}</tbody></table></div>
             : <div className="empty">Nobody present on this date.</div>}
+          {selectedPresent.length>2&&<button className="button secondary mobile-list-toggle" onClick={()=>setShowHistoryPresent(v=>!v)}>{showHistoryPresent?"Close list":`View all (${selectedPresent.length})`}</button>}
         </div>
       </div>
     </section>
