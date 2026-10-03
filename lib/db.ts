@@ -69,6 +69,19 @@ export function ensureSchema() {
         )
       `;
       await sql`CREATE INDEX IF NOT EXISTS attendance_sessions_date_idx ON attendance_sessions(attendance_date)`;
+      await sql`
+        INSERT INTO attendance_sessions(attendance_date,opened_at,cutoff_used,code_used,last_opened_at,manually_closed_at)
+        SELECT
+          a.attendance_date,
+          MIN(a.marked_at),
+          COALESCE(MIN(a.cutoff_used),(SELECT cutoff_time FROM attendance_settings WHERE id=1)),
+          '0000',
+          MIN(a.marked_at),
+          NULL
+        FROM attendance_marks a
+        GROUP BY a.attendance_date
+        ON CONFLICT(attendance_date) DO NOTHING
+      `;
 
       await sql`
         CREATE TABLE IF NOT EXISTS attendance_member_periods (
