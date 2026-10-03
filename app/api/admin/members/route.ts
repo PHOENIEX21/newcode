@@ -41,18 +41,32 @@ export async function PATCH(req:Request){
     const nextActive=Boolean(active);
     await sql`UPDATE attendance_members SET active=${nextActive} WHERE id=${memberId}`;
     if(nextActive){
-      await sql`
-        INSERT INTO attendance_member_periods(member_id,active_from,inactive_from)
-        SELECT ${memberId},(now() AT TIME ZONE 'Africa/Lagos')::date,NULL
-        WHERE NOT EXISTS (
-          SELECT 1 FROM attendance_member_periods
-          WHERE member_id=${memberId} AND inactive_from IS NULL
+      const reopened=await sql`
+        UPDATE attendance_member_periods
+        SET inactive_from=NULL
+        WHERE id=(
+          SELECT id FROM attendance_member_periods
+          WHERE member_id=${memberId}
+            AND inactive_from > (now() AT TIME ZONE 'Africa/Lagos')::date
+          ORDER BY active_from DESC,id DESC
+          LIMIT 1
         )
+        RETURNING id
       `;
+      if(!reopened[0]){
+        await sql`
+          INSERT INTO attendance_member_periods(member_id,active_from,inactive_from)
+          SELECT ${memberId},(now() AT TIME ZONE 'Africa/Lagos')::date,NULL
+          WHERE NOT EXISTS (
+            SELECT 1 FROM attendance_member_periods
+            WHERE member_id=${memberId} AND inactive_from IS NULL
+          )
+        `;
+      }
     }else{
       await sql`
         UPDATE attendance_member_periods
-        SET inactive_from=(now() AT TIME ZONE 'Africa/Lagos')::date
+        SET inactive_from=((now() AT TIME ZONE 'Africa/Lagos')::date + INTERVAL '1 day')::date
         WHERE member_id=${memberId} AND inactive_from IS NULL
       `;
     }
