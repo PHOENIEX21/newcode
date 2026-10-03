@@ -1,4 +1,5 @@
 "use client";
+// FINAL_ATTENDANCE_RELEASE
 import { useEffect, useMemo, useState } from "react";
 
 type Member={
