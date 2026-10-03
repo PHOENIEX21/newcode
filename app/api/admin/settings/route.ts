@@ -17,7 +17,30 @@ export async function POST(req:Request){
       await sql`UPDATE attendance_settings SET cutoff_time=${cutoff}::time,updated_at=now() WHERE id=1`;
     }
     if(body.is_open!==undefined){
-      await sql`UPDATE attendance_settings SET is_open=${Boolean(body.is_open)},updated_at=now() WHERE id=1`;
+      const opening=Boolean(body.is_open);
+      if(opening){
+        const clock=await sql`
+          SELECT
+            (now() AT TIME ZONE 'Africa/Lagos')::date AS today,
+            (now() AT TIME ZONE 'Africa/Lagos')::time AS now_time,
+            auto_close_time::text
+          FROM attendance_settings WHERE id=1
+        `;
+        const afterAutoClose=String(clock[0]?.now_time||"00:00:00").slice(0,8)>=String(clock[0]?.auto_close_time||"10:00:00").slice(0,8);
+        await sql`
+          UPDATE attendance_settings
+          SET is_open=true,
+              reopen_override_date=CASE WHEN ${afterAutoClose} THEN (now() AT TIME ZONE 'Africa/Lagos')::date ELSE NULL END,
+              updated_at=now()
+          WHERE id=1
+        `;
+      }else{
+        await sql`
+          UPDATE attendance_settings
+          SET is_open=false,reopen_override_date=NULL,updated_at=now()
+          WHERE id=1
+        `;
+      }
     }
     return NextResponse.json({message:"Settings updated."});
   }catch(e){console.error(e);return NextResponse.json({message:"Could not update settings."},{status:500})}
