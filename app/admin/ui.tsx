@@ -10,7 +10,7 @@ type DayRow={
   cutoff_used:string|null;minutes_late:number|null
 };
 type Dashboard={
-  settings:{current_code:string;is_open:boolean;cutoff_time:string};
+  settings:{current_code:string;is_open:boolean;effective_open:boolean;cutoff_time:string;auto_close_time:string;expired:boolean;reopened:boolean};
   members:Member[];today:DayRow[];selectedDay:DayRow[];selectedDate:string;month:string;date:string
 };
 
@@ -90,11 +90,11 @@ export default function AdminClient(){
 
     <section className="grid2" style={{marginTop:16}}>
       <div className="card">
-        <div className="split"><div><p className="muted small">TODAY&apos;S SESSION</p><h2>{data?.settings.is_open?"Attendance is open":"Attendance is closed"}</h2></div><span className="pill"><span className={"dot "+(data?.settings.is_open?"open":"")}/>{data?.date||"Today"}</span></div>
+        <div className="split"><div><p className="muted small">TODAY&apos;S SESSION</p><h2>{data?.settings.effective_open?"Attendance is open":data?.settings.expired?"Attendance expired at 10:00 AM":"Attendance is closed"}</h2></div><span className="pill"><span className={"dot "+(data?.settings.is_open?"open":"")}/>{data?.date||"Today"}</span></div>
         <div className="form">
           <div className="field"><label>4-digit code</label><div className="actions"><input className="input" style={{maxWidth:180}} value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,"").slice(0,4))} inputMode="numeric"/><button className="button" onClick={()=>settings({code})}>Save code</button><button className="button secondary" onClick={()=>{const c=String(Math.floor(1000+Math.random()*9000));setCode(c);settings({code:c})}}>Generate</button></div></div>
           <div className="field"><label>Approved marking time</label><div className="actions"><input type="time" className="input" style={{maxWidth:180}} value={cutoff} onChange={e=>setCutoff(e.target.value)}/><button className="button secondary" onClick={()=>settings({cutoff})}>Update cut-off</button></div></div>
-          <div className="actions"><button className="button" onClick={()=>settings({is_open:!data?.settings.is_open})}>{data?.settings.is_open?"Close attendance":"Open attendance"}</button></div>
+          <div className="muted small">Automatically locks at {data?.settings.auto_close_time||"10:00"} Lagos time. Admin can reopen it after expiry.</div><div className="actions"><button className="button" onClick={()=>settings({is_open:!data?.settings.effective_open})}>{data?.settings.effective_open?"Close attendance":data?.settings.expired?"Reopen attendance":"Open attendance"}</button></div>
         </div>
       </div>
 
