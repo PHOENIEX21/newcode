@@ -4,6 +4,11 @@ import { db } from "@/lib/db";
 import { lagosDate, lagosTime, monthBounds } from "@/lib/time";
 
 export const dynamic="force-dynamic";
+
+function cutoffLabel(value:any){
+  return value ? String(value).slice(0,5) : null;
+}
+
 export async function GET(req:Request){
   if(!(await isAdmin())) return NextResponse.json({message:"Unauthorized"},{status:401});
   try{
@@ -17,14 +22,14 @@ export async function GET(req:Request){
     const settings=(await sql`SELECT current_code,is_open,cutoff_time::text FROM attendance_settings WHERE id=1`)[0];
 
     const todayRows=await sql`
-      SELECT m.id,m.full_name,a.marked_at,a.status
+      SELECT m.id,m.full_name,a.marked_at,a.status,a.cutoff_used::text,a.minutes_late
       FROM attendance_members m
       LEFT JOIN attendance_marks a ON a.member_id=m.id AND a.attendance_date=${today}::date
       WHERE m.active=true ORDER BY m.full_name
     `;
 
     const selectedRows=await sql`
-      SELECT m.id,m.full_name,a.marked_at,a.status
+      SELECT m.id,m.full_name,a.marked_at,a.status,a.cutoff_used::text,a.minutes_late
       FROM attendance_members m
       LEFT JOIN attendance_marks a ON a.member_id=m.id AND a.attendance_date=${selectedDate}::date
       WHERE m.joined_at::date <= ${selectedDate}::date
@@ -37,7 +42,9 @@ export async function GET(req:Request){
     const memberRows=await sql`
       SELECT m.id,m.full_name,m.active,
         COUNT(a.id)::int AS days_present,
-        COUNT(a.id) FILTER (WHERE a.status='late')::int AS late_count
+        COUNT(a.id) FILTER (WHERE a.status='late')::int AS late_count,
+        COALESCE(SUM(a.minutes_late) FILTER (WHERE a.status='late'),0)::int AS total_minutes_late,
+        COALESCE(ROUND(AVG(a.minutes_late) FILTER (WHERE a.status='late')),0)::int AS avg_minutes_late
       FROM attendance_members m
       LEFT JOIN attendance_marks a ON a.member_id=m.id AND a.attendance_date BETWEEN ${start}::date AND ${end}::date
       GROUP BY m.id,m.full_name,m.active
@@ -47,16 +54,28 @@ export async function GET(req:Request){
     const members=memberRows.map((m:any)=>{
       const p=Number(m.days_present||0);
       const a=Math.max(0,elapsed-p);
-      return {...m,days_present:p,days_absent:a,late_count:Number(m.late_count||0),attendance_pct:elapsed?Math.round((p/elapsed)*100):0}
+      return {
+        ...m,
+        days_present:p,
+        days_absent:a,
+        late_count:Number(m.late_count||0),
+        total_minutes_late:Number(m.total_minutes_late||0),
+        avg_minutes_late:Number(m.avg_minutes_late||0),
+        attendance_pct:elapsed?Math.round((p/elapsed)*100):0
+      };
     });
 
-    const formattedToday=todayRows.map((r:any)=>({...r,marked_at:r.marked_at?lagosTime(r.marked_at):null}));
-    const formattedSelected=selectedRows.map((r:any)=>({...r,marked_at:r.marked_at?lagosTime(r.marked_at):null}));
+    const formatRow=(r:any)=>({
+      ...r,
+      marked_at:r.marked_at?lagosTime(r.marked_at):null,
+      cutoff_used:cutoffLabel(r.cutoff_used),
+      minutes_late:r.minutes_late==null?null:Number(r.minutes_late)
+    });
 
     return NextResponse.json({
       settings,
-      today:formattedToday,
-      selectedDay:formattedSelected,
+      today:todayRows.map(formatRow),
+      selectedDay:selectedRows.map(formatRow),
       selectedDate,
       members,
       month,
