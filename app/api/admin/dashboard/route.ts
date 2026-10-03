@@ -20,15 +20,20 @@ export async function GET(req:Request){
     const sql=await db();
 
     const settings=(await sql`
-      SELECT current_code,is_open,cutoff_time::text,auto_close_time::text,reopen_override_date,
+      SELECT current_code,is_open,cutoff_time::text,auto_close_time::text,reopen_override_date,code_date,session_date,
         (now() AT TIME ZONE 'Africa/Lagos')::date AS today,
         (now() AT TIME ZONE 'Africa/Lagos')::time AS now_time
       FROM attendance_settings WHERE id=1
     `)[0];
-    const reopened=String(settings?.reopen_override_date||"")===String(settings?.today||"");
+    const todayKey=String(settings?.today||"");
+    const codeReady=String(settings?.code_date||"")===todayKey;
+    const sessionToday=String(settings?.session_date||"")===todayKey;
+    const reopened=String(settings?.reopen_override_date||"")===todayKey;
     const expired=String(settings?.now_time||"00:00:00").slice(0,8)>=String(settings?.auto_close_time||"10:00:00").slice(0,8);
-    settings.effective_open=Boolean(settings?.is_open)&&(!expired||reopened);
-    settings.expired=expired&&!reopened;
+    settings.effective_open=Boolean(settings?.is_open)&&sessionToday&&codeReady&&(!expired||reopened);
+    settings.expired=sessionToday&&expired&&!reopened;
+    settings.code_ready=codeReady;
+    settings.session_today=sessionToday;
     settings.reopened=reopened;
     settings.auto_close_time=String(settings?.auto_close_time||"10:00:00").slice(0,5);
 
