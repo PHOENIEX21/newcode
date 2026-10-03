@@ -20,11 +20,15 @@ export function ensureSchema() {
           cutoff_time time NOT NULL DEFAULT '07:15',
           auto_close_time time NOT NULL DEFAULT '10:00',
           reopen_override_date date,
+          code_date date,
+          session_date date,
           updated_at timestamptz NOT NULL DEFAULT now()
         )
       `;
       await sql`ALTER TABLE attendance_settings ADD COLUMN IF NOT EXISTS auto_close_time time NOT NULL DEFAULT '10:00'`;
       await sql`ALTER TABLE attendance_settings ADD COLUMN IF NOT EXISTS reopen_override_date date`;
+      await sql`ALTER TABLE attendance_settings ADD COLUMN IF NOT EXISTS code_date date`;
+      await sql`ALTER TABLE attendance_settings ADD COLUMN IF NOT EXISTS session_date date`;
       await sql`
         INSERT INTO attendance_settings (id)
         VALUES (1)
