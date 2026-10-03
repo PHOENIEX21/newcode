@@ -91,3 +91,57 @@
   .monthly-filter-head small{font-size:11px;color:var(--muted)}
   .monthly-empty{padding:22px 12px;border:1px dashed var(--line);border-radius:14px;background:#fafcf9}
 }
+
+/* Monthly register: preserve desktop table layout on phones and allow horizontal scrolling. */
+@media(max-width:760px){
+  .monthly-scroll{
+    display:block!important;
+    overflow-x:auto!important;
+    overflow-y:hidden;
+    -webkit-overflow-scrolling:touch;
+    border:1px solid var(--line);
+    border-radius:15px;
+    background:#fff;
+  }
+  .monthly-scroll table.monthly-table{
+    display:table!important;
+    width:100%!important;
+    min-width:860px!important;
+    border-collapse:collapse;
+  }
+  .monthly-scroll .monthly-table thead{
+    display:table-header-group!important;
+  }
+  .monthly-scroll .monthly-table tbody{
+    display:table-row-group!important;
+  }
+  .monthly-scroll .monthly-table tr{
+    display:table-row!important;
+    background:transparent!important;
+    border:0!important;
+    border-radius:0!important;
+    padding:0!important;
+  }
+  .monthly-scroll .monthly-table th,
+  .monthly-scroll .monthly-table td{
+    display:table-cell!important;
+    padding:11px 12px!important;
+    border-bottom:1px solid #edf0ec!important;
+    white-space:nowrap!important;
+    text-align:left!important;
+    font-size:13px!important;
+  }
+  .monthly-scroll .monthly-table td::before{
+    content:none!important;
+  }
+  .monthly-scroll .monthly-table td:first-child{
+    font-weight:400!important;
+  }
+  .monthly-scroll .monthly-table .button{
+    width:auto!important;
+    min-height:auto!important;
+  }
+  .desktop-monthly,.mobile-monthly,.monthly-categories,.monthly-filter-head{
+    display:none!important;
+  }
+}
