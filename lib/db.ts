@@ -41,9 +41,13 @@ export function ensureSchema() {
           attendance_date date NOT NULL,
           marked_at timestamptz NOT NULL DEFAULT now(),
           status varchar(16) NOT NULL CHECK (status IN ('on_time','late')),
+          cutoff_used time,
+          minutes_late integer,
           UNIQUE(member_id, attendance_date)
         )
       `;
+      await sql`ALTER TABLE attendance_marks ADD COLUMN IF NOT EXISTS cutoff_used time`;
+      await sql`ALTER TABLE attendance_marks ADD COLUMN IF NOT EXISTS minutes_late integer`;
       await sql`CREATE INDEX IF NOT EXISTS attendance_marks_date_idx ON attendance_marks(attendance_date)`;
     })();
   }
