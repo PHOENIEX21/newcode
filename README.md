@@ -30,3 +30,5 @@ Run npm install, add the environment variables in .env.local, then run npm run d
 <!-- vercel reconnect test 1791016119289 -->
 
 <!-- deploy current monthly horizontal-scroll table -->
+
+<!-- final production deploy: session-based attendance accounting -->
